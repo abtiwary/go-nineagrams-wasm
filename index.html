@@ -114,9 +114,10 @@
 		function handle_user_submission() {
 			elem = document.getElementById("guess-container");
 			submission = elem.textContent;
+			encoded_submission = ToBase64JS({"to_encode":submission})
 
 			document.getElementById("game-response-container").style.visibility = "visible";
-			if (puzzle_solutions.includes(submission)) {
+			if (puzzle_solutions.includes(encoded_submission)) {
 				document.getElementById("game-response-container").innerHTML = "SOLVED!";
 				document.getElementById("game-response-new-game-btn").style.visibility = "visible";
 			} else {

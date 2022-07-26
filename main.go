@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"encoding/base64"
 	"encoding/json"
 	"math/rand"
 	"syscall/js"
@@ -38,12 +39,32 @@ func ShuffleKey(key string) string {
 	return string(keyRunes)
 }
 
+func ToBase64(toEncode string) string {
+	encodedStr := base64.StdEncoding.EncodeToString([]byte(toEncode))
+	return encodedStr
+}
+
+func FromBase64(toDecode string) string {
+	decodedStr, _ := base64.StdEncoding.DecodeString(toDecode)
+	return string(decodedStr)
+}
+
+func ToBase64JS(this js.Value, args []js.Value) interface{} {
+	toEncode := args[0].Get("to_encode").String()
+	return ToBase64(toEncode)
+}
+
+func FromBase64JS(this js.Value, args []js.Value) interface{} {
+	toDecode := args[0].Get("to_decode").String()
+	return FromBase64(toDecode)
+}
+
 func GetPuzzleWord(randomKey string, solutionInfo []WordInfo) (string, []interface{}) {
 	solutions := make(map[string]struct{})
 	solutionList := make([]interface{}, 0)
 	for _, s := range solutionInfo {
 		solutions[s.Word] = struct{}{}
-		solutionList = append(solutionList, s.Word)
+		solutionList = append(solutionList, ToBase64(s.Word))
 	}
 
 	var puzzleWord string
@@ -89,6 +110,8 @@ func main() {
 	c := make(chan bool)
 	js.Global().Set("PrintWASMLoadStatus", js.FuncOf(PrintWASMLoadStatus))
 	js.Global().Set("ComputeAPuzzleWord", js.FuncOf(ComputeAPuzzleWord))
+	js.Global().Set("ToBase64JS", js.FuncOf(ToBase64JS))
+	js.Global().Set("FromBase64JS", js.FuncOf(FromBase64JS))
 	<-c
 }
 
