@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<title>Nineagrams WASM</title>
+
+	<script src="wasm_exec.js"></script>
+
+	<script type="text/javascript">
+		var puzzle_word = null;
+		var puzzle_key = null;
+		var puzzle_solutions = null;
+	</script>
+
+	<style type="text/css">
+		.flex-container-col {
+			display: flex;
+			flex-direction: column;
+			padding: 10px;
+			margin: auto;
+			width: 50%;
+			text-align: center;
+		}
+
+		.user-entry-container {
+			display: flex;
+			flex-direction: row;
+			justify-content: space-between;
+		}
+
+		.user-entry-container .typeable {
+			width: 400px;
+			border: 2px solid blue;
+			min-width: 300px;
+			max-width: 300px;
+			font-size: 20px;
+		}
+
+		.user-entry-container button {
+			width: 150px;
+		}
+
+		.game-response-container {
+			display: block;
+			visibility: hidden;
+			font-size: 15px;
+		}
+
+		.game-response-new-game-btn {
+			display: block;
+			visibility: hidden;
+		}
+	</style>
+
+</head>
+
+<body onload="init()">
+	<div class="flex-container-col">
+		<br><br>
+		<div id="canvas_container">
+			<canvas id="canvas" width="250" height="250"></canvas>
+		</div>
+
+		<br><br>
+		<div class="user-entry-container">
+			<span class="typeable" id="guess-container" class="guess-container" contenteditable="true" onclick="handle_user_entry()">enter your guess</span>
+			<button class="button" onclick="handle_user_submission()">Submit</button>
+		</div>
+
+		<br><br>
+		<div class="game-response-container" id="game-response-container">
+			<div id="game-response"></div>
+		</div>
+
+		<br>
+		<div id="game-response-new-game-btn" class="game-response-new-game-btn">
+			<button onclick="new_game()">New Game?</button>
+		</div>
+
+	</div>
+
+	<script>
+		const init = () => {
+			if (!WebAssembly.instantiateStreaming) { // polyfill
+				WebAssembly.instantiateStreaming = async (resp, importObject) => {
+					const source = await (await resp).arrayBuffer();
+					return await WebAssembly.instantiate(source, importObject);
+				};
+			}
+
+			const go = new Go();
+			let mod, inst;
+			WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject).then((result) => {
+				mod = result.module;
+				inst = result.instance;
+				//console.clear();
+				go.run(inst)
+				console.log(PrintWASMLoadStatus());
+				puzzle_solutions = ComputeAPuzzleWord();
+				drawPuzzle(puzzle_word);
+			}).catch((err) => {
+				console.error(err);
+			});
+		};
+
+		function handle_user_entry() {
+			document.getElementById("game-response-container").style.visibility = "hidden";
+			document.getElementById("game-response-new-game-btn").style.visibility = "hidden";
+			elem = document.getElementById("guess-container");
+			elem.innerHTML = "";
+		}
+
+		function handle_user_submission() {
+			elem = document.getElementById("guess-container");
+			submission = elem.textContent;
+
+			document.getElementById("game-response-container").style.visibility = "visible";
+			if (puzzle_solutions.includes(submission)) {
+				document.getElementById("game-response-container").innerHTML = "SOLVED!";
+				document.getElementById("game-response-new-game-btn").style.visibility = "visible";
+			} else {
+				document.getElementById("game-response-container").innerHTML = "incorrect guess!";
+			}
+		}
+
+		function new_game() {
+			document.getElementById("game-response-container").style.visibility = "hidden";
+			document.getElementById("game-response-new-game-btn").style.visibility = "hidden";
+			elem = document.getElementById("guess-container");
+			elem.innerHTML = "";
+			puzzle_solutions = ComputeAPuzzleWord();
+			drawPuzzle(puzzle_word);
+		}
+
+		const drawPuzzle = (word_to_render) => {
+			canvas = document.getElementById("canvas");
+			if(canvas.getContext) {
+				ctx = canvas.getContext('2d');
+				ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+				// draw the grid
+				let path1 = new Path2D();
+				path1.rect(50, 50, 50, 50);
+				ctx.stroke(path1);
+				path1.rect(100, 50, 50, 50);
+				ctx.stroke(path1);
+				path1.rect(150, 50, 50, 50);
+				ctx.stroke(path1);
+				path1.rect(150, 50, 50, 50);
+				ctx.stroke(path1);
+
+				let path2 = new Path2D();
+				path2.rect(50, 100, 50, 50);
+				ctx.stroke(path2);
+				path2.rect(100, 100, 50, 50);
+				ctx.stroke(path2);
+				path2.rect(150, 100, 50, 50);
+				ctx.stroke(path2);
+				path2.rect(150, 100, 50, 50);
+				ctx.stroke(path2);
+
+				let path3 = new Path2D();
+				path3.rect(50, 150, 50, 50);
+				ctx.stroke(path3);
+				path3.rect(100, 150, 50, 50);
+				ctx.stroke(path3);
+				path3.rect(150, 150, 50, 50);
+				ctx.stroke(path3);
+				path3.rect(150, 150, 50, 50);
+				ctx.stroke(path3);
+
+				let path4 = new Path2D();
+				path4.rect(100, 100, 50, 50);
+				ctx.fill(path4);
+
+				// render the word!
+				let x = 0;
+				let y = 0;
+				for (var alphabet in word_to_render) {
+					//console.log(alphabet);
+					alphabet = parseInt(alphabet);
+					x = 50 + ((alphabet % 3) * 50);
+					y = 50 * Math.ceil((alphabet + 1) / 3);
+					if (alphabet === 4) {
+						ctx.moveTo(100,100);
+						ctx.fillStyle = "#ffffff";
+						ctx.font = "bold 30px verdana, sans-serif";
+						ctx.fillText(word_to_render[alphabet], 112.5, 135);
+					} else {
+						ctx.moveTo(x, y);
+						ctx.fillStyle = "#000000";
+						ctx.font = "bold 30px verdana, sans-serif";
+						ctx.fillText(word_to_render[alphabet], x + 12.5, y + 35);
+					}
+				}
+			}
+		}
+
+	</script>
+</body>
+
+</html>
