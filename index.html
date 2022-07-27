@@ -10,6 +10,8 @@
 	<script type="text/javascript">
 		var puzzle_word = null;
 		var puzzle_key = null;
+		var puzzle_data_str = null;
+		var puzzle_data = null;
 		var puzzle_solutions = null;
 	</script>
 
@@ -98,6 +100,7 @@
 				go.run(inst)
 				console.log(PrintWASMLoadStatus());
 				puzzle_solutions = ComputeAPuzzleWord();
+				puzzle_data = JSON.parse(puzzle_data_str);
 				drawPuzzle(puzzle_word);
 			}).catch((err) => {
 				console.error(err);

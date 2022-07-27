@@ -12,6 +12,14 @@ import (
 //go:embed nineletterwords.json
 var fs embed.FS
 
+var (
+	words        map[string][]WordInfo
+	puzzleKeys   []string
+	solutionList []interface{}
+	puzzleWord   string
+	puzzleKey    string
+)
+
 type WordInfo struct {
 	Word  string `json:"word"`
 	Rank  string `json:"rank"`
@@ -60,58 +68,76 @@ func FromBase64JS(this js.Value, args []js.Value) interface{} {
 }
 
 func GetPuzzleWord(randomKey string, solutionInfo []WordInfo) (string, []interface{}) {
-	solutions := make(map[string]struct{})
-	solutionList := make([]interface{}, 0)
+	solutionSet := make(map[string]struct{})
+	listOfSolutions := make([]interface{}, 0)
 	for _, s := range solutionInfo {
-		solutions[s.Word] = struct{}{}
-		solutionList = append(solutionList, ToBase64(s.Word))
+		solutionSet[s.Word] = struct{}{}
+		listOfSolutions = append(listOfSolutions, ToBase64(s.Word))
 	}
 
-	var puzzleWord string
+	var word string
 	for {
 		// shuffle the randomKey, then check that it isn't one of the solutions
 		shuffledRandomKey := ShuffleKey(randomKey)
 
-		if _, ok := solutions[shuffledRandomKey]; !ok {
-			puzzleWord = shuffledRandomKey
+		if _, ok := solutionSet[shuffledRandomKey]; !ok {
+			word = shuffledRandomKey
 			break
 		}
 	}
-	return puzzleWord, solutionList
+	return word, listOfSolutions
 }
 
 func ComputeAPuzzleWord(this js.Value, args []js.Value) interface{} {
-	data, _ := fs.ReadFile("nineletterwords.json")
+	// pick a key at random
+	puzzleKey = GetRandomKey(puzzleKeys)
+	solutions := words[puzzleKey]
 
-	// read the embedded JSON document
-	var words map[string][]WordInfo
-	_ = json.Unmarshal(data, &words)
-
-	// extract a list of all the keys
-	// each key is nine letter word - but sorted
-	keys := make([]string, 0, len(words))
-	for k := range words {
-		keys = append(keys, k)
-	}
-
-	// next, pick a key at random
-	randomKey := GetRandomKey(keys)
-	solutions := words[randomKey]
 	// get the final word to use in the puzzle
-	puzzleWord, solutionList := GetPuzzleWord(randomKey, solutions)
+	puzzleWord, solutionList = GetPuzzleWord(puzzleKey, solutions)
 
 	js.Global().Set("puzzle_word", puzzleWord)
-	js.Global().Set("puzzle_key", randomKey)
+	js.Global().Set("puzzle_key", puzzleKey)
+
+	wordsAsJson := make(map[string][]string)
+	for k := range words {
+		wordsAsJson[k] = make([]string, 0)
+		for _, v := range words[k] {
+			wordsAsJson[k] = append(wordsAsJson[k], v.Word)
+		}
+	}
+	wordsAsJsonStr, _ := json.Marshal(wordsAsJson)
+	js.Global().Set("puzzle_data_str", string(wordsAsJsonStr))
 
 	return solutionList
 }
 
+func InitializeApp() {
+	data, _ := fs.ReadFile("nineletterwords.json")
+	// read the embedded JSON document
+	_ = json.Unmarshal(data, &words)
+
+	// extract a list of all the keys
+	// each key is nine letter word - but sorted
+	for k := range words {
+		puzzleKeys = append(puzzleKeys, k)
+	}
+
+}
+
 func main() {
 	c := make(chan bool)
+	words = make(map[string][]WordInfo)
+	puzzleKeys = make([]string, 0)
+	solutionList = make([]interface{}, 0)
+
+	InitializeApp()
+
 	js.Global().Set("PrintWASMLoadStatus", js.FuncOf(PrintWASMLoadStatus))
 	js.Global().Set("ComputeAPuzzleWord", js.FuncOf(ComputeAPuzzleWord))
 	js.Global().Set("ToBase64JS", js.FuncOf(ToBase64JS))
 	js.Global().Set("FromBase64JS", js.FuncOf(FromBase64JS))
+
 	<-c
 }
 
