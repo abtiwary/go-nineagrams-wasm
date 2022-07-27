@@ -103,7 +103,7 @@ func ComputeAPuzzleWord(this js.Value, args []js.Value) interface{} {
 	for k := range words {
 		wordsAsJson[k] = make([]string, 0)
 		for _, v := range words[k] {
-			wordsAsJson[k] = append(wordsAsJson[k], v.Word)
+			wordsAsJson[k] = append(wordsAsJson[k], ToBase64(v.Word))
 		}
 	}
 	wordsAsJsonStr, _ := json.Marshal(wordsAsJson)
