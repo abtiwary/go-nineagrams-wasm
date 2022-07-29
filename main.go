@@ -1,15 +1,17 @@
 package main
 
 import (
+	"compress/gzip"
 	"embed"
 	"encoding/base64"
 	"encoding/json"
+	"io"
 	"math/rand"
 	"syscall/js"
 	"time"
 )
 
-//go:embed nineletterwords.json
+//go:embed nineletterwords.json.gz
 var fs embed.FS
 
 var (
@@ -113,9 +115,11 @@ func ComputeAPuzzleWord(this js.Value, args []js.Value) interface{} {
 }
 
 func InitializeApp() {
-	data, _ := fs.ReadFile("nineletterwords.json")
+	jsonFile, _ := fs.Open("nineletterwords.json.gz")
+	gz, _ := gzip.NewReader(jsonFile)
+	jsonBody, _ := io.ReadAll(gz)
 	// read the embedded JSON document
-	_ = json.Unmarshal(data, &words)
+	_ = json.Unmarshal(jsonBody, &words)
 
 	// extract a list of all the keys
 	// each key is nine letter word - but sorted
