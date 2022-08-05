@@ -13,6 +13,10 @@
 		var puzzle_data_str = null;
 		var puzzle_data = null;
 		var puzzle_solutions = null;
+
+		var slider = null;
+		var game_difficulty = 2;
+        var fill_patterns = {};
 	</script>
 
 	<style type="text/css">
@@ -60,6 +64,12 @@
 <body onload="init()">
 	<div class="flex-container-col">
 		<br><br>
+		Game difficulty:
+		<div class="slidecontainer">
+			<input type="range" min="1" max="4" value="2" class="slider" id="slider">
+		</div>
+
+		<br><br>
 		<div id="canvas_container">
 			<canvas id="canvas" width="250" height="250"></canvas>
 		</div>
@@ -101,10 +111,24 @@
 				console.log(PrintWASMLoadStatus());
 				puzzle_solutions = ComputeAPuzzleWord();
 				puzzle_data = JSON.parse(puzzle_data_str);
-				drawPuzzle(puzzle_word);
+				drawPuzzle(puzzle_word, 100);
 			}).catch((err) => {
 				console.error(err);
 			});
+
+			slider = document.getElementById("slider");
+
+            slider.oninput = function() {
+                console.log(slider.value);
+				game_difficulty = parseInt(slider.value);
+				new_game();
+            }
+
+            fill_patterns[4] = [0, 1, 0, 1, 0, 1, 0, 1, 0];
+            fill_patterns[5] = [0, 1, 0, 1, 1, 1, 0, 1, 0];
+            fill_patterns[7] = [1, 1, 1, 0, 1, 0, 1, 1, 1];
+            fill_patterns[8] = [1, 1, 1, 1, 0, 1, 1, 1, 1];
+            fill_patterns[9] = [1, 1, 1, 1, 1, 1, 1, 1, 1];
 		};
 
 		function handle_user_entry() {
@@ -134,69 +158,86 @@
 			elem = document.getElementById("guess-container");
 			elem.innerHTML = "";
 			puzzle_solutions = ComputeAPuzzleWord();
-			drawPuzzle(puzzle_word);
+			drawPuzzle(puzzle_word, 100);
 		}
 
-		const drawPuzzle = (word_to_render) => {
+		const drawPuzzle = (word_to_render, delta) => {
+            let word_len = word_to_render.length;
+            console.log(word_len);
+
+            delta = (delta < 50) ? 50 : delta;
+
 			canvas = document.getElementById("canvas");
 			if(canvas.getContext) {
-				ctx = canvas.getContext('2d');
+                canvas.width = delta*5;
+                canvas.height = delta*5;
+                ctx = canvas.getContext('2d');
 				ctx.clearRect(0, 0, canvas.width, canvas.height);
 
 				// draw the grid
 				let path1 = new Path2D();
-				path1.rect(50, 50, 50, 50);
+				path1.rect(50, 50, delta, delta);
 				ctx.stroke(path1);
-				path1.rect(100, 50, 50, 50);
+				path1.rect(50 + delta, 50, delta, delta);
 				ctx.stroke(path1);
-				path1.rect(150, 50, 50, 50);
+				path1.rect(50 + (2*delta), 50, delta, delta);
 				ctx.stroke(path1);
-				path1.rect(150, 50, 50, 50);
+				path1.rect(50 + (2*delta), 50, delta, delta);
 				ctx.stroke(path1);
 
 				let path2 = new Path2D();
-				path2.rect(50, 100, 50, 50);
+				path2.rect(50, 50 + delta, delta, delta);
 				ctx.stroke(path2);
-				path2.rect(100, 100, 50, 50);
+				path2.rect(50 + delta, 50 + delta, delta, delta);
 				ctx.stroke(path2);
-				path2.rect(150, 100, 50, 50);
+				path2.rect(50 + (2*delta), 50 + delta, delta, delta);
 				ctx.stroke(path2);
-				path2.rect(150, 100, 50, 50);
+				path2.rect(50 + (2*delta), 50 + delta, delta, delta);
 				ctx.stroke(path2);
 
 				let path3 = new Path2D();
-				path3.rect(50, 150, 50, 50);
+				path3.rect(50, 50 + (2*delta), delta, delta);
 				ctx.stroke(path3);
-				path3.rect(100, 150, 50, 50);
+				path3.rect(50 + delta, 50 + (2*delta), delta, delta);
 				ctx.stroke(path3);
-				path3.rect(150, 150, 50, 50);
+				path3.rect(50 + (2*delta), 50 + (2*delta), delta, delta);
 				ctx.stroke(path3);
-				path3.rect(150, 150, 50, 50);
+				path3.rect(50 + (2*delta), 50 + (2*delta), delta, delta);
 				ctx.stroke(path3);
 
 				let path4 = new Path2D();
-				path4.rect(100, 100, 50, 50);
+				path4.rect(50 + delta, 50 + delta, delta, delta);
 				ctx.fill(path4);
 
 				// render the word!
 				let x = 0;
 				let y = 0;
-				for (var alphabet in word_to_render) {
+                let fill_pattern = fill_patterns[word_len];
+                let alpha_idx = 0;
+                let idx = 0;
+				for (var fp in fill_pattern) {
+                    if (fill_pattern[fp] == 0) { 
+                        idx += 1;
+                        continue; 
+                    }  
+                    let alphabet = word_to_render[alpha_idx];
 					//console.log(alphabet);
-					alphabet = parseInt(alphabet);
-					x = 50 + ((alphabet % 3) * 50);
-					y = 50 * Math.ceil((alphabet + 1) / 3);
-					if (alphabet === 4) {
+					x = 50 + ((idx % 3) * delta);
+					y = delta * Math.ceil((idx + 1) / 3);
+                    //console.log("x = " + x + "; y = " + y);
+					if (idx === 4) {
 						ctx.moveTo(100,100);
 						ctx.fillStyle = "#ffffff";
-						ctx.font = "bold 30px verdana, sans-serif";
-						ctx.fillText(word_to_render[alphabet], 112.5, 135);
+						ctx.font = "bold " + (30*(delta/50)) + "px verdana, sans-serif";
 					} else {
 						ctx.moveTo(x, y);
 						ctx.fillStyle = "#000000";
-						ctx.font = "bold 30px verdana, sans-serif";
-						ctx.fillText(word_to_render[alphabet], x + 12.5, y + 35);
+						ctx.font = "bold " + (30*(delta/50)) + "px verdana, sans-serif";
 					}
+                    ctx.fillText(alphabet, x + (delta / 3), y + (delta/(delta/25)));
+                    //console.log("dx = " + (x + (delta / 3)) + "; dy = " + (y + (delta/(delta/25))));
+                    alpha_idx += 1;
+                    idx += 1;
 				}
 			}
 		}

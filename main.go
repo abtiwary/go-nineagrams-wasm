@@ -5,27 +5,29 @@ import (
 	"embed"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"math/rand"
 	"syscall/js"
 	"time"
 )
 
-//go:embed nineletterwords.json.gz
+//go:embed *.json.gz
 var fs embed.FS
 
 var (
-	words        map[string][]WordInfo
-	puzzleKeys   []string
+	difficulties map[int]string
+	words        map[int]map[string][]WordInfo
+	puzzleKeys   map[int][]string
 	solutionList []interface{}
 	puzzleWord   string
 	puzzleKey    string
 )
 
 type WordInfo struct {
-	Word  string `json:"word"`
-	Rank  string `json:"rank"`
-	Count string `json:"count"`
+	Word    string `json:"word"`
+	Count   string `json:"count"`
+	Percent string `json:"percent"`
 }
 
 func init() {
@@ -91,9 +93,13 @@ func GetPuzzleWord(randomKey string, solutionInfo []WordInfo) (string, []interfa
 }
 
 func ComputeAPuzzleWord(this js.Value, args []js.Value) interface{} {
+	// get the game difficulty
+	gameDifficulty := js.Global().Get("game_difficulty").Int()
+	fmt.Println(gameDifficulty)
+
 	// pick a key at random
-	puzzleKey = GetRandomKey(puzzleKeys)
-	solutions := words[puzzleKey]
+	puzzleKey = GetRandomKey(puzzleKeys[gameDifficulty])
+	solutions := words[gameDifficulty][puzzleKey]
 
 	// get the final word to use in the puzzle
 	puzzleWord, solutionList = GetPuzzleWord(puzzleKey, solutions)
@@ -102,9 +108,9 @@ func ComputeAPuzzleWord(this js.Value, args []js.Value) interface{} {
 	js.Global().Set("puzzle_key", puzzleKey)
 
 	wordsAsJson := make(map[string][]string)
-	for k := range words {
+	for k := range words[gameDifficulty] {
 		wordsAsJson[k] = make([]string, 0)
-		for _, v := range words[k] {
+		for _, v := range words[gameDifficulty][k] {
 			wordsAsJson[k] = append(wordsAsJson[k], ToBase64(v.Word))
 		}
 	}
@@ -115,24 +121,35 @@ func ComputeAPuzzleWord(this js.Value, args []js.Value) interface{} {
 }
 
 func InitializeApp() {
-	jsonFile, _ := fs.Open("nineletterwords.json.gz")
-	gz, _ := gzip.NewReader(jsonFile)
-	jsonBody, _ := io.ReadAll(gz)
-	// read the embedded JSON document
-	_ = json.Unmarshal(jsonBody, &words)
+	for k, v := range difficulties {
+		jsonFile, _ := fs.Open(v)
+		gz, _ := gzip.NewReader(jsonFile)
+		jsonBody, _ := io.ReadAll(gz)
+		wordsAtK := make(map[string][]WordInfo)
+		_ = json.Unmarshal(jsonBody, &wordsAtK)
+		words[k] = wordsAtK
 
-	// extract a list of all the keys
-	// each key is nine letter word - but sorted
-	for k := range words {
-		puzzleKeys = append(puzzleKeys, k)
+		// extract a list of all the keys
+		// each key is an X letter word - but sorted
+		pKeys := make([]string, 0)
+		for k := range words[k] {
+			pKeys = append(pKeys, k)
+		}
+		puzzleKeys[k] = pKeys
 	}
-
 }
 
 func main() {
 	c := make(chan bool)
-	words = make(map[string][]WordInfo)
-	puzzleKeys = make([]string, 0)
+
+	difficulties = make(map[int]string)
+	difficulties[1] = "four_letters.json.gz"
+	difficulties[2] = "five_letters.json.gz"
+	difficulties[3] = "eight_letters.json.gz"
+	difficulties[4] = "nine_letters.json.gz"
+
+	words = make(map[int]map[string][]WordInfo)
+	puzzleKeys = make(map[int][]string)
 	solutionList = make([]interface{}, 0)
 
 	InitializeApp()
